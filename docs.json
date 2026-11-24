@@ -1,0 +1,24 @@
+{
+  "$schema": "https://docs.page/schema.json",
+  "name": "Regional Test Configuration Validator",
+  "description": "A dependency-free validator and field guide for reviewable regional web testing",
+  "theme": {
+    "primary": "#0f766e"
+  },
+  "content": {
+    "showPageTitle": true,
+    "showPageImage": false
+  },
+  "sidebar": [
+    {
+      "group": "Field guide",
+      "icon": "globe",
+      "pages": [
+        {
+          "title": "Regional test configuration",
+          "href": "/"
+        }
+      ]
+    }
+  ]
+}

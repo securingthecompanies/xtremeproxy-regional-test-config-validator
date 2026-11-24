@@ -1,0 +1,15 @@
+{
+  "market": "CA",
+  "sessionMode": "sticky",
+  "stickyMinutes": 10,
+  "targetUrl": "https://example.com/storefront",
+  "allowedHosts": [
+    "example.com"
+  ],
+  "credentialEnv": "REGIONAL_PROXY_URL",
+  "evidence": {
+    "captureTimestamp": true,
+    "captureFinalUrl": true,
+    "captureStatusCode": true
+  }
+}

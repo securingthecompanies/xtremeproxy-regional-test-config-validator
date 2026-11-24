@@ -1,0 +1,81 @@
+---
+title: Regional test configuration that reviewers can trust
+description: Validate market, session, endpoint and evidence settings before a regional web test begins.
+---
+
+# Regional test configuration that reviewers can trust
+
+Regional web tests often begin with a reasonable goal: confirm what a permitted public page shows from a particular market. Trouble starts when the configuration lives in a chat message, a copied shell command or an undocumented CI secret. A result may look convincing while the route, session behavior or observation window remains ambiguous. This guide presents a small, dependency-free validator that turns those choices into an explicit contract before a test runs.
+
+The validator does not make network requests and does not test a proxy. It reads a local JSON file, checks the fields that make an observation reproducible, and returns either a normalized configuration or specific errors. That narrow responsibility is useful: configuration mistakes are separated from DNS, authentication, transport, TLS and application failures.
+
+## Define the question before the route
+
+Write one sentence describing the decision the test will support. “Check whether the approved landing page exposes the expected public price in Canada” is reviewable. “See what the site does from everywhere” is not. Record the target URL, permitted market, observation time and expected evidence. Keep the scope limited to systems and content the team is authorized to inspect.
+
+The example configuration uses a small allowlist instead of accepting arbitrary destinations. `targetUrl` must use HTTPS and its hostname must appear in `allowedHosts`. This prevents a convenient QA tool from quietly becoming an unrestricted request launcher. The validator also rejects embedded credentials, so a file can be reviewed without leaking a password.
+
+## Model session behavior explicitly
+
+A regional route and a session policy answer different questions. A rotating session is useful when independent observations should begin with a fresh route. A sticky session is useful when a multi-step journey must preserve continuity. Neither is universally better. The important point is that the selection is visible.
+
+The sample supports `rotating` and `sticky`. Sticky mode also requires `stickyMinutes`, bounded between one and sixty minutes. The bound is a safety rail rather than a performance claim. A team can adjust it in the source after reviewing its own provider contract and test design. What matters is preventing an accidental, indefinite session from being treated as a short controlled observation.
+
+## Reference secrets; never store them
+
+`credentialEnv` names an environment variable, such as `REGIONAL_PROXY_URL`. The configuration contains the name, not the value. At runtime, a separate, authorized test runner may read that secret from an approved store. The included validator deliberately does not read environment variables, print credentials or open sockets.
+
+This separation makes code review more meaningful. Reviewers can approve the market, mode, hostname and evidence policy without gaining access to the credential. Logs should redact user information and authority components from URLs. If a failure message must show an endpoint, report only the scheme, redacted host label and port needed for diagnosis.
+
+## Install and run the validator
+
+The project requires only a current Node.js runtime. No package installation is necessary.
+
+```bash
+node src/validate-config.mjs examples/regional-test.config.json
+node test.mjs
+```
+
+The first command prints normalized JSON when the file is valid. It exits with a non-zero code and a concise list of fields when validation fails. The second command exercises valid and invalid cases without contacting any external service. This makes the check suitable for a local preflight or a CI job that runs before authorized browser automation.
+
+## Preserve evidence without collecting excess data
+
+The configuration requires an `evidence` object with three booleans: `captureTimestamp`, `captureFinalUrl` and `captureStatusCode`. These fields are intentionally modest. They help distinguish an observation from an unsupported screenshot while avoiding cookies, response bodies and personal data by default.
+
+## Diagnose failures by layer
+
+When a validated test still fails, label the first failing layer. Configuration errors include an unsupported market or malformed URL. Resolution errors concern DNS. Connection errors occur before a usable transport exists. Authentication errors come from the route provider. TLS errors concern certificate or hostname verification. Application errors are valid HTTP responses that do not match the expected public behavior.
+
+Do not respond to every failure by increasing retries. A retry can hide a deterministic configuration problem and consume more capacity. Preserve the first failure, apply a small bounded retry only to plausibly transient layers, and record whether the retry reused the same sticky session. If rotating mode is selected, state whether each attempt is intentionally independent.
+
+## Put the contract in CI
+
+Commit the non-secret configuration beside the test that consumes it. Run the validator before browser installation or a long test suite. A pull request that changes `market`, `sessionMode`, `allowedHosts` or evidence requirements then exposes the operational change to reviewers.
+
+## Interpret a passing result correctly
+
+A passing validator means only that the configuration meets this project’s documented rules. It does not prove that a route is available, an address belongs to a claimed geography, a destination permits automation or an observation is representative of every user. Those questions require provider documentation, destination terms, controlled runtime evidence and human review.
+
+## Relationship and responsible use
+
+This field guide is maintained by XtremeProxy. Teams comparing residential, ISP, datacenter and mobile options for authorized regional QA can review the [XtremeProxy product catalogue](https://xtremeproxy.com/products) while keeping provider selection separate from the validation method described here.
+
+Use regional access only for lawful, authorized work. Respect destination terms, access controls, rate limits, privacy obligations and applicable law. Do not use this example to evade restrictions, conceal abuse or access non-public data. The best regional test is one whose scope, route, evidence and owner remain understandable after the original operator has moved on.
+
+## FAQ
+
+### Why not put the proxy URL in the JSON file?
+
+Because URLs commonly contain usernames and passwords. Referencing a protected environment variable keeps the reviewable contract separate from the secret and reduces the chance of committing credentials.
+
+### Does sticky mode guarantee the same exit address?
+
+No. The validator records intent, not provider behavior. Confirm actual session semantics with the selected service and capture bounded runtime evidence.
+
+### Can the validator confirm a country?
+
+No. It validates an allowlisted market label. Geography verification requires an authorized runtime observation and should be treated as evidence with uncertainty, not an absolute identity claim.
+
+### What should happen after a validation error?
+
+Fix the configuration rather than bypassing the check. If a rule is genuinely unsuitable, change the validator and document the rationale so the exception remains reviewable.
